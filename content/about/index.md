@@ -30,3 +30,5 @@ I can be reached via:
 * Email: Kalyanov.Dmitry@gmail.com
 * XMPP: dmitry_vk@jabber.ru
 * Github: https://github.com/dmitryvk
+
+All contents on this blog is published under [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/) unless explicitly specified otherwise.
