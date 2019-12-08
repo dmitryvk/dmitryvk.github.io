@@ -1,0 +1,9 @@
+[submodule "themes/hugo-primer"]
+	path = themes/hugo-primer
+	url = https://github.com/qqhann/hugo-primer.git
+[submodule "themes/bare"]
+	path = themes/bare
+	url = https://github.com/orf/bare-hugo-theme.git
+[submodule "themes/slick"]
+	path = themes/slick
+	url = https://github.com/spookey/slick.git
