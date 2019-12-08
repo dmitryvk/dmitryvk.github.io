@@ -1,0 +1,51 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Posts on dmitry_vk&#39;s notes</title>
+		<link>https://dmitryvk.github.io/posts/</link>
+		<description>Recent content in Posts on dmitry_vk&#39;s notes</description>
+		<generator>Hugo 0.60.1 -- gohugo.io</generator>
+		<language>en-us</language>
+		<managingEditor>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</managingEditor>
+		<webMaster>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</webMaster>
+		<lastBuildDate>Sun, 08 Dec 2019 03:15:07 +0300</lastBuildDate>
+		<atom:link href="https://dmitryvk.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		<item>
+			<title>Notes on guaranteed shutdown of test containers</title>
+			<link>https://dmitryvk.github.io/posts/test-container-shutdown/</link>
+			<pubDate>Sun, 08 Dec 2019 03:15:07 +0300</pubDate>
+			<author>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</author>
+			<guid isPermaLink="true">https://dmitryvk.github.io/posts/test-container-shutdown/</guid>
+			<description>&lt;p&gt;One use for containers is to provision dependencies for automated software testing.&lt;/p&gt;
+&lt;p&gt;This approach is supported by at least several libraries for several languages. For example, one popular library is &lt;a href=&#34;https://testcontainers.org&#34;&gt;TestContainers&lt;/a&gt; and its .NET port &lt;a href=&#34;https://github.com/testcontainers/testcontainers-dotnet&#34;&gt;TestContainers-dotnet&lt;/a&gt;. These libraries are usually easy to set up and easy to use.&lt;/p&gt;
+&lt;p&gt;Usually, one would start the container in &lt;code&gt;setUp&lt;/code&gt; and stop the container in &lt;code&gt;tearDown&lt;/code&gt;. This approach usually works fine but it does one quite big drawback: &lt;strong&gt;if a test crashes then you leak the container&lt;/strong&gt;.&lt;/p&gt;
+&lt;p&gt;In my prior experiences with provisioning dependencies for automated tests, it is very easy to exhaust resources when debugging tests or when tests fail to clean up after themselves. I believe that tests should be as robust as possible so I find this situation unacceptable.&lt;/p&gt;
+&lt;p&gt;I had not seen any mention of this in documentation so I decided to share what I use to prevent this issue.&lt;/p&gt;
+&lt;p&gt;I had tried different techniques to overcome this issue and I had settled on the following technique:&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;All containers are started with &lt;code&gt;autoremove&lt;/code&gt; option to ensure that storage is cleaned up when the container is stopped.
+But this is not enough - we need to ensure that the container will actually be stopped.&lt;/li&gt;
+&lt;li&gt;When the container starts, the watchdog is injected which monitors whether there is an active user of the container.&lt;/li&gt;
+&lt;li&gt;If watchdog detects that test software has unexpectedly disconnected from container then it forcibly terminates the container.&lt;/li&gt;
+&lt;li&gt;One of the easy and robust ways of implementing watchdog is the following:
+&lt;ol&gt;
+&lt;li&gt;
+&lt;p&gt;A shell script is injected into a running container that reads from standard input until it is closed.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span style=&#34;color:#75715e&#34;&gt;# this loop will keep running while tests are attached to the container&lt;/span&gt;
+&lt;span style=&#34;color:#75715e&#34;&gt;# when docker detects client disconnect the loop will be terminated&lt;/span&gt;
+&lt;span style=&#34;color:#66d9ef&#34;&gt;while&lt;/span&gt; read VAR; &lt;span style=&#34;color:#66d9ef&#34;&gt;do&lt;/span&gt;
+  true;
+&lt;span style=&#34;color:#66d9ef&#34;&gt;done&lt;/span&gt;;
+
+kill -9 &lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt; &lt;span style=&#34;color:#75715e&#34;&gt;# or some other command that will terminate the container&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;Background task inside the test process starts and attaches to the injected script.&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;This reliably ensures that tests don&#39;t leave unused containers behind.&lt;/p&gt;
+</description>
+		</item>
+	</channel>
+</rss>

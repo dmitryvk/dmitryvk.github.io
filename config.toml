@@ -2,6 +2,7 @@ baseURL = "https://dmitryvk.github.io/"
 languageCode = "en-us"
 title = "dmitry_vk's notes"
 theme = "slick"
+publishDir = "docs"
 
 [taxonomies]
 tags = "tags"
