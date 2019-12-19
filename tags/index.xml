@@ -1,0 +1,13 @@
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+	<channel>
+		<title>Tags on dmitry_vk&#39;s notes</title>
+		<link>https://dmitryvk.github.io/tags/</link>
+		<description>Recent content in Tags on dmitry_vk&#39;s notes</description>
+		<generator>Hugo 0.60.1 -- gohugo.io</generator>
+		<language>en-us</language>
+		<managingEditor>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</managingEditor>
+		<webMaster>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</webMaster>
+		<lastBuildDate>Sun, 08 Dec 2019 03:15:07 +0300</lastBuildDate>
+		<atom:link href="https://dmitryvk.github.io/tags/index.xml" rel="self" type="application/rss+xml" />
+	</channel>
+</rss>
