@@ -16,7 +16,7 @@
 			<author>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</author>
 			<guid isPermaLink="true">https://dmitryvk.github.io/posts/test-container-shutdown/</guid>
 			<description>&lt;p&gt;One use for containers is to provision dependencies for automated software testing.&lt;/p&gt;
-&lt;p&gt;This approach is supported by at least several libraries for several languages. For example, one popular library is &lt;a href=&#34;https://testcontainers.org&#34;&gt;TestContainers&lt;/a&gt; and its .NET port &lt;a href=&#34;https://github.com/testcontainers/testcontainers-dotnet&#34;&gt;TestContainers-dotnet&lt;/a&gt;. These libraries are usually easy to set up and easy to use.&lt;/p&gt;
+&lt;p&gt;This approach is supported by at least several libraries for several languages. These libraries are usually easy to set up and easy to use.&lt;/p&gt;
 &lt;p&gt;Usually, one would start the container in &lt;code&gt;setUp&lt;/code&gt; and stop the container in &lt;code&gt;tearDown&lt;/code&gt;. This approach usually works fine but it does one quite big drawback: &lt;strong&gt;if a test crashes then you leak the container&lt;/strong&gt;.&lt;/p&gt;
 &lt;p&gt;In my prior experiences with provisioning dependencies for automated tests, it is very easy to exhaust resources when debugging tests or when tests fail to clean up after themselves. I believe that tests should be as robust as possible so I find this situation unacceptable.&lt;/p&gt;
 &lt;p&gt;I had not seen any mention of this in documentation so I decided to share what I use to prevent this issue.&lt;/p&gt;
@@ -45,6 +45,9 @@ kill -9 &lt;span style=&#34;color:#ae81ff&#34;&gt;1&lt;/span&gt; &lt;span style=
 &lt;/li&gt;
 &lt;/ol&gt;
 &lt;p&gt;This reliably ensures that tests don&#39;t leave unused containers behind.&lt;/p&gt;
+&lt;p&gt;Some container management libraries do not even try solve this issue (e.g., popular .NET library &lt;a href=&#34;https://github.com/testcontainers/testcontainers-dotnet&#34;&gt;TestContainers-dotnet&lt;/a&gt;).&lt;/p&gt;
+&lt;p&gt;&lt;a href=&#34;https://testcontainers.org&#34;&gt;TestContainers&lt;/a&gt; (a java library) uses different approach for ensuring guaranteed shutdown and release of all used resources. It starts a separate container (called &lt;code&gt;ryuk&lt;/code&gt;) and establishes persistent connection to it; &lt;code&gt;ryuk&lt;/code&gt; then uses this connection to monitor presence of its client. I haven&#39;t used it extensively, but apparently it works really well. Note that this is not mentioned in &lt;code&gt;TestContainers&lt;/code&gt;&amp;rsquo; documentation and I even missed this very important feature on my first review of such libraries.&lt;/p&gt;
+&lt;p&gt;(Updated on 2019-12-19 to mention &lt;code&gt;ryuk&lt;/code&gt;)&lt;/p&gt;
 </description>
 		</item>
 	</channel>

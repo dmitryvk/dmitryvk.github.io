@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta http-equiv="X-UA-Compatible" content="IE=edge" />
   <meta name="description" content="One use for containers is to provision dependencies for automated software testing.
-This approach is supported by at least several libraries for several languages. For example, one popular library is TestContainers and its .NET port TestContainers-dotnet. These libraries are usually easy to set up and easy to use.
+This approach is supported by at least several libraries for several languages. These libraries are usually easy to set up and easy to use.
 Usually, one would start the container in setUp and stop the container in tearDown. This approach usually works fine but it does one quite big drawback: if a test crashes then you leak the container." />
   <meta name="author" content="Dmitry Kalanov" />
   <meta name="generator" content="Hugo 0.60.1" />
@@ -65,7 +65,7 @@ Usually, one would start the container in setUp and stop the container in tearDo
   </div>
   <div>
     <p>One use for containers is to provision dependencies for automated software testing.</p>
-<p>This approach is supported by at least several libraries for several languages. For example, one popular library is <a href="https://testcontainers.org">TestContainers</a> and its .NET port <a href="https://github.com/testcontainers/testcontainers-dotnet">TestContainers-dotnet</a>. These libraries are usually easy to set up and easy to use.</p>
+<p>This approach is supported by at least several libraries for several languages. These libraries are usually easy to set up and easy to use.</p>
 <p>Usually, one would start the container in <code>setUp</code> and stop the container in <code>tearDown</code>. This approach usually works fine but it does one quite big drawback: <strong>if a test crashes then you leak the container</strong>.</p>
 <p>In my prior experiences with provisioning dependencies for automated tests, it is very easy to exhaust resources when debugging tests or when tests fail to clean up after themselves. I believe that tests should be as robust as possible so I find this situation unacceptable.</p>
 <p>I had not seen any mention of this in documentation so I decided to share what I use to prevent this issue.</p>
@@ -94,6 +94,9 @@ kill -9 <span style="color:#ae81ff">1</span> <span style="color:#75715e"># or so
 </li>
 </ol>
 <p>This reliably ensures that tests don't leave unused containers behind.</p>
+<p>Some container management libraries do not even try solve this issue (e.g., popular .NET library <a href="https://github.com/testcontainers/testcontainers-dotnet">TestContainers-dotnet</a>).</p>
+<p><a href="https://testcontainers.org">TestContainers</a> (a java library) uses different approach for ensuring guaranteed shutdown and release of all used resources. It starts a separate container (called <code>ryuk</code>) and establishes persistent connection to it; <code>ryuk</code> then uses this connection to monitor presence of its client. I haven't used it extensively, but apparently it works really well. Note that this is not mentioned in <code>TestContainers</code>&rsquo; documentation and I even missed this very important feature on my first review of such libraries.</p>
+<p>(Updated on 2019-12-19 to mention <code>ryuk</code>)</p>
 
   </div>
 </div>
