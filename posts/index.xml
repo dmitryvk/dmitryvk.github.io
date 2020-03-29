@@ -7,8 +7,109 @@
 		<language>en-us</language>
 		<managingEditor>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</managingEditor>
 		<webMaster>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</webMaster>
-		<lastBuildDate>Sun, 08 Dec 2019 03:15:07 +0300</lastBuildDate>
+		<lastBuildDate>Sun, 29 Mar 2020 20:29:45 +0300</lastBuildDate>
 		<atom:link href="https://dmitryvk.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
+		<item>
+			<title>Small example of async GUI code with Gtk-rs: alert() function</title>
+			<link>https://dmitryvk.github.io/posts/gtkrs-async-alert-example/</link>
+			<pubDate>Sun, 29 Mar 2020 20:29:45 +0300</pubDate>
+			<author>Kalyanov.Dmitry@gmail.com (Dmitry Kalanov)</author>
+			<guid isPermaLink="true">https://dmitryvk.github.io/posts/gtkrs-async-alert-example/</guid>
+			<description>&lt;p&gt;&lt;em&gt;Note&lt;/em&gt;: this post was written assuming the following versions:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Gtk-rs 0.8.1&lt;/li&gt;
+&lt;li&gt;Async-std 1.5.0&lt;/li&gt;
+&lt;li&gt;Glib-rs 0.9.3&lt;/li&gt;
+&lt;li&gt;futures 0.3.4&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;Let&#39;s suppose that I want to write the following function in Rust with Gtk-rs:&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;&lt;span style=&#34;color:#e6db74&#34;&gt;/// Display the message in the dialog window and wait for it to be dismissed by the user.
+&lt;/span&gt;&lt;span style=&#34;color:#e6db74&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;pub&lt;/span&gt; async &lt;span style=&#34;color:#66d9ef&#34;&gt;fn&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;alert&lt;/span&gt;(title: &lt;span style=&#34;color:#66d9ef&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;str&lt;/span&gt;, text: &lt;span style=&#34;color:#66d9ef&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;str&lt;/span&gt;);
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;After some experimentation, I found that one good way to implement such a function is to use one-shot channels.
+Currently, &lt;code&gt;futures&lt;/code&gt; crate &lt;a href=&#34;https://docs.rs/futures/0.3.4/futures/channel/oneshot/index.html&#34;&gt;provides them&lt;/a&gt;
+on stable releases &amp;mdash; so I&#39;ll use those. Note that Rust&#39;s async ecosystem still evolves and things might change in the future.&lt;/p&gt;
+&lt;p&gt;Oneshot channels are created with &lt;a href=&#34;https://docs.rs/futures/0.3.4/futures/channel/oneshot/fn.channel.html&#34;&gt;&lt;code&gt;oneshot::channel()&lt;/code&gt;&lt;/a&gt; function
+and have two ends: sender and receiver.
+The key property is that &lt;em&gt;the receiver end is a &lt;code&gt;Future&lt;/code&gt;&lt;/em&gt;. We will use this to build our functions.&lt;/p&gt;
+&lt;p&gt;In this article, I&#39;ll walk us through the implementation of &lt;code&gt;alert()&lt;/code&gt; function.&lt;/p&gt;
+&lt;p&gt;That&#39;s a function epilogue and some &lt;code&gt;use&lt;/code&gt;&#39;s which we&#39;ll need later. Note that the function is declared as async
+which means that it actually returns an anonymous implementation of &lt;code&gt;Future&amp;lt;Output=()&amp;gt;&lt;/code&gt;.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;&lt;span style=&#34;color:#e6db74&#34;&gt;/// Display the message in the dialog window and wait for it to be dismissed by the user.
+&lt;/span&gt;&lt;span style=&#34;color:#e6db74&#34;&gt;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;pub&lt;/span&gt; async &lt;span style=&#34;color:#66d9ef&#34;&gt;fn&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;alert&lt;/span&gt;(title: &lt;span style=&#34;color:#66d9ef&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;str&lt;/span&gt;, text: &lt;span style=&#34;color:#66d9ef&#34;&gt;&amp;amp;&lt;/span&gt;&lt;span style=&#34;color:#66d9ef&#34;&gt;str&lt;/span&gt;) {
+
+    &lt;span style=&#34;color:#66d9ef&#34;&gt;use&lt;/span&gt; gtk::prelude::&lt;span style=&#34;color:#f92672&#34;&gt;*&lt;/span&gt;;
+    &lt;span style=&#34;color:#66d9ef&#34;&gt;use&lt;/span&gt; std::rc::Rc;
+    &lt;span style=&#34;color:#66d9ef&#34;&gt;use&lt;/span&gt; std::cell::RefCell;
+    &lt;span style=&#34;color:#66d9ef&#34;&gt;use&lt;/span&gt; futures::channel::oneshot::channel &lt;span style=&#34;color:#66d9ef&#34;&gt;as&lt;/span&gt; oneshot_channel;
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;We will need a channel that will hold the result of our function. Since the result is an empty unit value,
+this channel will act as an event or barrier on which further code will wait.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;let&lt;/span&gt; (result_sender, result_receiver) &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; oneshot_channel();
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;Next, we will have to deal with some memory management details. Here are a few important facts:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;a href=&#34;https://docs.rs/futures/0.3.4/futures/channel/oneshot/struct.Sender.html#method.send&#34;&gt;&lt;code&gt;oneshot::Sender::send()&lt;/code&gt;&lt;/a&gt; method consumes &lt;code&gt;Self&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Gtk-rs&#39;s accepts bare &lt;code&gt;Fn(&amp;amp;Self)&lt;/code&gt; functions as callbacks
+(e.g., see &lt;a href=&#34;https://docs.rs/gtk/0.8.1/gtk/trait.DialogExt.html#tymethod.connect_response&#34;&gt;DialogExt.connect_response&lt;/a&gt;).
+These may be potentially called multiple times and hence they capture their environments as immutable &lt;code&gt;&amp;amp;&lt;/code&gt;-borrows.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;These two facts combined together means that we need to wrap &lt;code&gt;result_sender&lt;/code&gt; in several wrappers:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;Option&lt;/code&gt;. We will use &lt;code&gt;Option::take()&lt;/code&gt; method to be able to consume the sender&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;RefCell&lt;/code&gt;. Since our callback is an &lt;code&gt;Fn()&lt;/code&gt;, the captured environment is immutable and we need interior mutability to be able to send into the channel.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;Rc&lt;/code&gt;. &lt;code&gt;result_sender&lt;/code&gt; will be shared between our main async stack frame and callback.&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;let&lt;/span&gt; result_sender &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; Rc::new(RefCell::new(Some(result_sender)));
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;Then we are ready to build our UI widget.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;let&lt;/span&gt; dialog &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; gtk::MessageDialogBuilder::new()
+        .buttons(gtk::ButtonsType::Ok)
+        .message_type(gtk::MessageType::Info)
+        .text(text)
+        .modal(&lt;span style=&#34;color:#66d9ef&#34;&gt;true&lt;/span&gt;)
+        .title(title)
+        .type_(gtk::WindowType::Toplevel)
+        .build();
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;Then we should attach handler for &lt;a href=&#34;https://developer.gnome.org/gtk3/stable/GtkDialog.html#GtkDialog-response&#34;&gt;&lt;code&gt;response&lt;/code&gt; signal&lt;/a&gt; which is emitted
+when user responds to dialog (e.g., by closing it or by click on &lt;code&gt;OK&lt;/code&gt; button). In our case, we don&#39;t care what was the user&#39;s response - we just
+need to known when user dismissed the dialog.&lt;/p&gt;
+&lt;p&gt;The &lt;code&gt;Rc&lt;/code&gt; with the sender is cloned; in this case, it&#39;s not strictly necessary, but in general, it is usually required to clone objects that go
+into callback&#39;s captured environment.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    &lt;span style=&#34;color:#66d9ef&#34;&gt;let&lt;/span&gt; result_sender2 &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; result_sender.clone();
+    dialog.connect_response(&lt;span style=&#34;color:#66d9ef&#34;&gt;move&lt;/span&gt; &lt;span style=&#34;color:#f92672&#34;&gt;|&lt;/span&gt;_, response&lt;span style=&#34;color:#f92672&#34;&gt;|&lt;/span&gt; {
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;In the &lt;code&gt;response&lt;/code&gt; signal handler, we need to notify the channel that we are done. First we unwrap all layers of wrappers and then send the unit value into the channel.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;        println&lt;span style=&#34;color:#f92672&#34;&gt;!&lt;/span&gt;(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;Response={}&amp;#34;&lt;/span&gt;, response);
+        &lt;span style=&#34;color:#66d9ef&#34;&gt;let&lt;/span&gt; result_sender &lt;span style=&#34;color:#f92672&#34;&gt;=&lt;/span&gt; result_sender2.borrow_mut().take().unwrap();
+        result_sender.send(()).unwrap();
+    });
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;After the signal handler is connected, we should show the dialog.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    dialog.show_all();
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;And then we await from the receiver end of the channel. Since we are awaiting &lt;em&gt;asynchronously&lt;/em&gt;, Gtk+ event loop keeps processing events &lt;em&gt;concurrently&lt;/em&gt; while we are waiting.
+And that&#39;s very important &amp;mdash; otherwise, our dialog which we just created would not be able to show itself on a screen and accept user input.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    result_receiver.await.unwrap();
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;After the &lt;code&gt;response&lt;/code&gt; signal, the dialog window will stay open and be visible to the user. We need to close the window with &lt;code&gt;.destroy()&lt;/code&gt; method.&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;Note&lt;/em&gt;: Gtk+ terminology of &lt;code&gt;close&lt;/code&gt;, &lt;code&gt;delete&lt;/code&gt; and &lt;code&gt;destroy&lt;/code&gt; is pretty confusing. I&#39;ve had to re-read documentation and examples multiple times to double-check my code.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;    dialog.destroy();
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;The dialog window now is not displayed but the corresponding Gtk+ object still exists. Rust&#39;s RAII (&lt;code&gt;Drop&lt;/code&gt;) will clean it up automatically at this point.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;And now, we just need to run this function. The current version of Gtk-rs has all the necessary pieces to run async GUI code.&lt;/p&gt;
+&lt;p&gt;The following code will initialize Gtk+ and then run async code to completion and then will quit the program.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;pre style=&#34;color:#f8f8f2;background-color:#272822;-moz-tab-size:4;-o-tab-size:4;tab-size:4&#34;&gt;&lt;code class=&#34;language-rust&#34; data-lang=&#34;rust&#34;&gt;async &lt;span style=&#34;color:#66d9ef&#34;&gt;fn&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;ui_main&lt;/span&gt;() {
+    alert(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;Message&amp;#34;&lt;/span&gt;, &lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;Hello, world&amp;#34;&lt;/span&gt;).await;    
+}
+
+&lt;span style=&#34;color:#66d9ef&#34;&gt;fn&lt;/span&gt; &lt;span style=&#34;color:#a6e22e&#34;&gt;main&lt;/span&gt;() {
+    gtk::init().expect(&lt;span style=&#34;color:#e6db74&#34;&gt;&amp;#34;Failed to initialize Gtk+&amp;#34;&lt;/span&gt;);
+
+    glib::MainContext::default().spawn_local(async &lt;span style=&#34;color:#66d9ef&#34;&gt;move&lt;/span&gt; {
+        ui_main().await;
+        gtk::main_quit();
+    });
+
+    gtk::main();
+}
+&lt;/code&gt;&lt;/pre&gt;&lt;/div&gt;&lt;p&gt;&lt;em&gt;Note&lt;/em&gt;: Some time ago I released a &lt;a href=&#34;https://crates.io/crates/gtk-future-executor&#34;&gt;gtk-future-executor crate&lt;/a&gt; which could be used to execute the future on Gtk+ event loop.
+This crate should be considered obsolete.&lt;/p&gt;
+&lt;p&gt;The whole example is available &lt;a href=&#34;https://gist.github.com/dmitryvk/9ce63c7114d9a4eb570b0292ec4ef813&#34;&gt;as a gist&lt;/a&gt;.&lt;/p&gt;
+</description>
+		</item>
 		<item>
 			<title>Notes on guaranteed shutdown of test containers</title>
 			<link>https://dmitryvk.github.io/posts/test-container-shutdown/</link>

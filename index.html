@@ -49,6 +49,28 @@
   <div>
     <h2 class="post-title">
       
+      <a href="/posts/gtkrs-async-alert-example/">Small example of async GUI code with Gtk-rs: alert() function</a>
+    </h2>
+    
+<div class="post-meta">
+  <span>Date</span> &#x5b;
+    <time datetime="2020-03-29T20:29:45&#43;03:00">
+      29 Mar 2020
+    </time>
+  &#x5d;
+</div>
+
+  </div>
+  <div>
+    Note: this post was written assuming the following versions:
+ Gtk-rs 0.8.1 Async-std 1.5.0 Glib-rs 0.9.3 futures 0.3.4  Let's suppose that I want to write the following function in Rust with Gtk-rs:
+/// Display the message in the dialog window and wait for it to be dismissed by the user. pub async fn alert(title: &amp;str, text: &amp;str); After some experimentation, I found that one good way to implement such a function is to use one-shot channels.
+  </div>
+</div>
+<div>
+  <div>
+    <h2 class="post-title">
+      
       <a href="/posts/test-container-shutdown/">Notes on guaranteed shutdown of test containers</a>
     </h2>
     
